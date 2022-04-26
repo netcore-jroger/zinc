@@ -88,7 +88,14 @@ func MultipleSearch(c *gin.Context) {
 				continue
 			}
 			if v, ok := doc["index"]; ok {
-				indexName = v.(string)
+				switch v := v.(type) {
+				case string:
+					indexName = v
+				case []interface{}:
+					for _, v := range v {
+						indexName = v.(string)
+					}
+				}
 			} else {
 				indexName = defaultIndexName
 			}

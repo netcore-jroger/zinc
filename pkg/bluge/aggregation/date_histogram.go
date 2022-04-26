@@ -3,6 +3,7 @@ package aggregation
 import (
 	"math"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/blugelabs/bluge/search"
@@ -17,6 +18,9 @@ type DateHistogramAggregation struct {
 	minDocCount      int
 	format           string
 	timeZone         *time.Location
+
+	extendedBounds *HistogramBound
+	hardBounds     *HistogramBound
 
 	aggregations map[string]search.Aggregation
 
@@ -33,6 +37,8 @@ func NewDateHistogramAggregation(
 	fixedInterval int64,
 	format string,
 	timeZone *time.Location,
+	extendedBounds,
+	hardBounds *HistogramBound,
 	minDocCount,
 	size int) *DateHistogramAggregation {
 	rv := &DateHistogramAggregation{
@@ -43,6 +49,8 @@ func NewDateHistogramAggregation(
 		minDocCount:      minDocCount,
 		format:           format,
 		timeZone:         timeZone,
+		extendedBounds:   extendedBounds,
+		hardBounds:       hardBounds,
 		desc:             false,
 		lessFunc: func(a, b *search.Bucket) bool {
 			return a.Name() < b.Name()
@@ -73,6 +81,8 @@ func (t *DateHistogramAggregation) Calculator() search.Calculator {
 		timeZone:         t.timeZone,
 		minValue:         math.MaxInt64,
 		maxValue:         math.MinInt64,
+		extendedBounds:   t.extendedBounds,
+		hardBounds:       t.hardBounds,
 		aggregations:     t.aggregations,
 		desc:             t.desc,
 		lessFunc:         t.lessFunc,
@@ -94,8 +104,10 @@ type DateHistogramCalculator struct {
 	format           string
 	timeZone         *time.Location
 
-	minValue int64
-	maxValue int64
+	minValue       int64
+	maxValue       int64
+	extendedBounds *HistogramBound
+	hardBounds     *HistogramBound
 
 	aggregations map[string]search.Aggregation
 
@@ -157,6 +169,21 @@ func (a *DateHistogramCalculator) Merge(other search.Calculator) {
 }
 
 func (a *DateHistogramCalculator) Finish() {
+	// re calculate min max
+	if a.extendedBounds != nil {
+		min := int64(a.extendedBounds.Min * 1e6)
+		max := int64(a.extendedBounds.Max * 1e6)
+		if a.minValue > min {
+			a.minValue = min
+		}
+		if a.maxValue < max {
+			a.maxValue = max
+		}
+	}
+	if a.hardBounds != nil {
+		a.minValue = int64(a.hardBounds.Min * 1e6)
+		a.maxValue = int64(a.hardBounds.Max * 1e6)
+	}
 	// Replenish bucket
 	if a.minDocCount == 0 {
 		if a.calendarInterval != "" {
@@ -270,6 +297,10 @@ func (a *DateHistogramCalculator) bucketKey(value int64) string {
 		nsec = t.UnixNano()
 	} else {
 		nsec = (value / a.fixedInterval) * a.fixedInterval
+	}
+
+	if a.format == "epoch_millis" {
+		return strconv.FormatInt(time.Unix(0, nsec).In(a.timeZone).UnixMilli(), 10)
 	}
 
 	return time.Unix(0, nsec).In(a.timeZone).Format(a.format)

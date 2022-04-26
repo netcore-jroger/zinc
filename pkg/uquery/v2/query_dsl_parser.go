@@ -21,9 +21,9 @@ import (
 // ParseQueryDSL parse query DSL and return searchRequest
 func ParseQueryDSL(q *meta.ZincQuery, mappings *meta.Mappings, analyzers map[string]*analysis.Analyzer) (bluge.SearchRequest, error) {
 	// parse size
-	if q.Size == 0 {
-		q.Size = 10
-	}
+	// if q.Size == 0 {
+	// 	q.Size = 10
+	// }
 	if q.Size > startup.LoadMaxResults() {
 		q.Size = startup.LoadMaxResults()
 	}

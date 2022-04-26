@@ -30,13 +30,9 @@ func NewProperty(typ string) Property {
 		Format:         "",
 		Index:          true,
 		Store:          false,
-		Sortable:       true,
-		Aggregatable:   true,
+		Sortable:       false,
+		Aggregatable:   false,
 		Highlightable:  false,
-	}
-	if typ == "text" {
-		p.Sortable = false
-		p.Aggregatable = false
 	}
 
 	return p

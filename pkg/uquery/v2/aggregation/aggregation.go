@@ -2,6 +2,8 @@ package aggregation
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/blugelabs/bluge/search"
@@ -137,6 +139,8 @@ func Request(req zincaggregation.SearchAggregation, aggs map[string]meta.Aggrega
 					search.Field(agg.Histogram.Field),
 					agg.Histogram.Interval,
 					agg.Histogram.Offset,
+					agg.Histogram.ExtendedBounds,
+					agg.Histogram.HardBounds,
 					agg.Histogram.MinDocCount,
 					agg.Histogram.Size,
 				)
@@ -155,6 +159,9 @@ func Request(req zincaggregation.SearchAggregation, aggs map[string]meta.Aggrega
 		case agg.DateHistogram != nil:
 			if agg.DateHistogram.Size == 0 {
 				agg.DateHistogram.Size = startup.LoadAggregationTermsSize()
+			}
+			if agg.DateHistogram.Interval != "" {
+				agg.DateHistogram.FixedInterval = agg.DateHistogram.Interval
 			}
 			if agg.DateHistogram.CalendarInterval == "" && agg.DateHistogram.FixedInterval == "" {
 				return errors.New(errors.ErrorTypeParsingException, "[date_histogram] aggregation calendar_interval or fixed_interval must be set one")
@@ -204,13 +211,15 @@ func Request(req zincaggregation.SearchAggregation, aggs map[string]meta.Aggrega
 			}
 			var subreq *zincaggregation.DateHistogramAggregation
 			switch mappings.Properties[agg.DateHistogram.Field].Type {
-			case "time":
+			case "date", "time":
 				subreq = zincaggregation.NewDateHistogramAggregation(
 					search.Field(agg.DateHistogram.Field),
 					agg.DateHistogram.CalendarInterval,
 					interval,
 					agg.DateHistogram.Format,
 					timeZone,
+					agg.DateHistogram.ExtendedBounds,
+					agg.DateHistogram.HardBounds,
 					agg.DateHistogram.MinDocCount,
 					agg.DateHistogram.Size,
 				)
@@ -301,22 +310,33 @@ func Response(bucket *search.Bucket) (map[string]meta.AggregationResponse, error
 	for name, v := range aggs {
 		switch v := v.(type) {
 		case search.MetricCalculator:
-			resp[name] = meta.AggregationResponse{Value: v.Value()}
+			f := v.Value()
+			if math.IsNaN(f) {
+				f = 0
+			}
+			resp[name] = meta.AggregationResponse{Value: f}
 		case search.DurationCalculator:
 			resp[name] = meta.AggregationResponse{Value: v.Duration().Milliseconds()}
 		case search.BucketCalculator:
 			buckets := v.Buckets()
-			aggResp := meta.AggregationResponse{Buckets: make([]meta.AggregationBucket, 0)}
-			aggRespBuckets := make([]meta.AggregationBucket, 0)
+			aggResp := meta.AggregationResponse{Buckets: make([]map[string]interface{}, 0)}
+			aggRespBuckets := make([]map[string]interface{}, 0)
 			for _, bucket := range buckets {
-				aggBucket := meta.AggregationBucket{Key: bucket.Name(), DocCount: bucket.Count()}
+				aggBucket := map[string]interface{}{"key": bucket.Name(), "doc_count": bucket.Count()}
+				if zutils.IsNumeric(bucket.Name()) {
+					key, _ := strconv.ParseInt(bucket.Name(), 10, 64)
+					aggBucket["key"] = key
+					aggBucket["key_as_string"] = bucket.Name()
+				}
 				if subAggs := bucket.Aggregations(); len(subAggs) > 1 {
 					subResp, err := Response(bucket)
 					if err != nil {
 						return nil, err
 					}
 					delete(subResp, "count")
-					aggBucket.Aggregations = subResp
+					for k, v := range subResp {
+						aggBucket[k] = v
+					}
 				}
 				aggRespBuckets = append(aggRespBuckets, aggBucket)
 			}

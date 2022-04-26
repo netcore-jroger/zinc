@@ -53,8 +53,6 @@ func MultipleSearch(c *gin.Context) {
 	scanner := bufio.NewScanner(c.Request.Body)
 	defer c.Request.Body.Close()
 
-	// Set 1 MB max per line. docs at - https://pkg.go.dev/bufio#pkg-constants
-	// This is the max size of a line in a file that we will process
 	const maxCapacityPerLine = 1024 * 1024
 	buf := make([]byte, maxCapacityPerLine)
 	scanner.Buffer(buf, maxCapacityPerLine)

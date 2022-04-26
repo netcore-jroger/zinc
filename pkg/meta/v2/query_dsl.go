@@ -203,6 +203,7 @@ type Aggregations struct {
 	Min               *AggregationMetric            `json:"min"`
 	Sum               *AggregationMetric            `json:"sum"`
 	Count             *AggregationMetric            `json:"count"`
+	Cardinality       *AggregationMetric            `json:"cardinality"`
 	Terms             *AggregationsTerms            `json:"terms"`
 	Range             *AggregationRange             `json:"range"`
 	DateRange         *AggregationDateRange         `json:"date_range"`

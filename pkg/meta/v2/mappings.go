@@ -35,7 +35,10 @@ func NewProperty(typ string) Property {
 		Highlightable:  false,
 	}
 
-	if typ == "numeric" {
+	switch typ {
+	case "keyword":
+		p.Aggregatable = true
+	case "numeric":
 		p.Sortable = true
 		p.Aggregatable = true
 	}

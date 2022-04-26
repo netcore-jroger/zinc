@@ -99,7 +99,7 @@ func Request(req zincaggregation.SearchAggregation, aggs map[string]meta.Aggrega
 				}
 			}
 			switch mappings.Properties[agg.DateRange.Field].Type {
-			case "time":
+			case "date", "time":
 				subreq = aggregations.DateRanges(search.Field(agg.DateRange.Field))
 				for _, v := range agg.DateRange.Ranges {
 					from := time.Time{}
@@ -270,7 +270,7 @@ func Request(req zincaggregation.SearchAggregation, aggs map[string]meta.Aggrega
 			}
 			var subreq *zincaggregation.AutoDateHistogramAggregation
 			switch mappings.Properties[agg.AutoDateHistogram.Field].Type {
-			case "time":
+			case "date", "time":
 				subreq = zincaggregation.NewAutoDateHistogramAggregation(
 					search.Field(agg.AutoDateHistogram.Field),
 					agg.AutoDateHistogram.Buckets,
